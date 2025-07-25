@@ -29,7 +29,7 @@
 
 Request:
 {
-  "phone": "+79991234567"
+  "phone_number": "+79991234567"
 }
 
 Response:
