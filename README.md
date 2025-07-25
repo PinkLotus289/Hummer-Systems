@@ -34,8 +34,9 @@ Request:
 
 Response:
 {
-  "status": "ok",
-  "message": "Code sent"
+    "message": "Код отправлен",
+    "phone_number": "+79991234567",
+    "test_code": "1234"
 }
 
 ### ▶️ Авторизация: проверка кода
