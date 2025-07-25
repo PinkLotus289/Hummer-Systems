@@ -1,0 +1,262 @@
+{% extends 'base.html' %}
+{% block title %}Профиль | Hummer Systems{% endblock %}
+{% block content %}
+<style>
+  .profile-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 70vh;
+  }
+  .profile-card {
+      background: #1e293b;
+      padding: 2rem;
+      border-radius: 1rem;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  .profile-card h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1.5rem;
+  }
+  .profile-card .field {
+      margin-bottom: 0.8rem;
+      font-size: 1.1rem;
+  }
+  .profile-card .field strong {
+      color: #38bdf8;
+  }
+  .profile-card h2 {
+      margin-top: 1.5rem;
+      font-size: 1.2rem;
+      color: #7dd3fc;
+  }
+  .profile-card ul {
+      list-style: disc;
+      padding-left: 1.2rem;
+      margin-top: 0.5rem;
+  }
+  .profile-card input {
+      width: calc(100% - 140px);
+      padding: 0.7rem;
+      border: none;
+      border-radius: 0.5rem;
+      margin-top: 0.8rem;
+      font-size: 1rem;
+      background: #fff;
+      color: #000;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  .profile-card button {
+      width: 120px;
+      margin-left: 10px;
+      padding: 0.7rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      color: #fff;
+      background: linear-gradient(90deg, #06b6d4, #3b82f6);
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+  }
+  .profile-card button:hover {
+      transform: translateY(-1px);
+      opacity: .95;
+  }
+  .activate-group {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-top: 0.8rem;
+  }
+  .activate-group input {
+      flex: 1;
+      margin: 0;
+      padding: 0.9rem;
+      border-radius: 0.6rem;
+      border: none;
+      font-size: 1rem;
+      background: #fff;
+      color: #000;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  .activate-group button {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
+      min-width: 140px;
+      padding: 0.9rem 1.4rem;
+      border: none;
+      border-radius: 0.6rem;
+      font-size: 1rem;
+      line-height: 1.2rem;
+      color: #fff;
+      background: linear-gradient(90deg, #06b6d4, #3b82f6);
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      white-space: nowrap;
+  }
+  .activate-group button:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+  }
+  .message {
+      display: none;
+      margin-top: 1rem;
+      padding: 0.8rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.95rem;
+      text-align: center;
+  }
+  .message.success {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid #22c55e;
+  }
+  .message.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid #ef4444;
+  }
+</style>
+
+<div class="profile-wrapper">
+  <div class="profile-card">
+    <h1>Ваш профиль</h1>
+    <div class="field"><strong>Телефон:</strong> <span id="phone"></span></div>
+    <div class="field"><strong>Ваш invite‑код:</strong> <span id="invite_code"></span></div>
+    <div class="field"><strong>Вы активировали код:</strong> <span id="used_invite_code"></span></div>
+
+    <h2>Приглашённые пользователи</h2>
+    <ul id="invited_users"><li>Загрузка...</li></ul>
+
+    <h2>Активировать чужой код</h2>
+    <div class="activate-group">
+      <input type="text" id="foreignCode" placeholder="Введите код">
+      <button id="activateBtn" onclick="activateInvite()">Активировать</button>
+    </div>
+
+    <div id="feedback" class="message"></div>
+  </div>
+</div>
+
+<script>
+function showMessage(text, type='success') {
+    const box = document.getElementById('feedback');
+    box.textContent = text;
+    box.className = 'message ' + type;
+    box.style.display = 'block';
+    setTimeout(() => {
+        box.style.display = 'none';
+    }, 4000);
+}
+
+function parseErrorResponse(errorData) {
+    if (typeof errorData === 'string') return errorData;
+    if (errorData.error) return errorData.error;
+    if (errorData.detail) return errorData.detail;
+    if (errorData.invite_code) return Array.isArray(errorData.invite_code) ? errorData.invite_code.join(' ') : errorData.invite_code;
+    if (errorData.phone_number) return Array.isArray(errorData.phone_number) ? errorData.phone_number.join(' ') : errorData.phone_number;
+    return JSON.stringify(errorData);
+}
+
+function validateInviteCode(code) {
+    if (!code) return 'Введите инвайт‑код.';
+    if (code.length !== 6) return 'Инвайт‑код должен состоять из 6 символов.';
+    return '';
+}
+
+async function loadProfile() {
+    const token = sessionStorage.getItem('access');
+    if (!token) {
+        showMessage('Нет токена авторизации, войдите снова.', 'error');
+        window.location.href = '/ui/phone_form/';
+        return;
+    }
+    const resp = await fetch('/auth/profile/', {headers: {'Authorization': `Bearer ${token}`}});
+    if (resp.ok) {
+        const data = await resp.json();
+        document.getElementById('phone').textContent = data.phone_number;
+        document.getElementById('invite_code').textContent = data.invite_code;
+        document.getElementById('used_invite_code').textContent = data.used_invite_code || 'не активирован';
+        const list = document.getElementById('invited_users');
+        list.innerHTML = '';
+        if (data.invited_users.length > 0) {
+            data.invited_users.forEach(u => {
+                const li = document.createElement('li');
+                li.textContent = u;
+                list.appendChild(li);
+            });
+        } else {
+            list.innerHTML = '<li>Пока никто не использовал ваш код</li>';
+        }
+    } else {
+        showMessage('Ошибка загрузки профиля', 'error');
+    }
+}
+
+async function activateInvite() {
+    const btn = document.getElementById('activateBtn');
+    if (btn.disabled) return;
+
+    const code = document.getElementById('foreignCode').value.trim();
+    const usedElem = document.getElementById('used_invite_code');
+    const ownElem = document.getElementById('invite_code');
+    const usedCode = usedElem ? usedElem.textContent.trim() : '';
+    const ownCode = ownElem ? ownElem.textContent.trim() : '';
+    const token = sessionStorage.getItem('access');
+
+    if (usedCode && usedCode !== 'не активирован') {
+        showMessage('Вы уже активировали чужой код ранее.', 'error');
+        return;
+    }
+    if (code === ownCode) {
+        showMessage('Нельзя активировать свой собственный инвайт‑код.', 'error');
+        return;
+    }
+    const codeError = validateInviteCode(code);
+    if (codeError) {
+        showMessage(codeError, 'error');
+        return;
+    }
+
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.textContent = 'Отправка…';
+
+    try {
+        const resp = await fetch('/auth/profile/use_invite/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+            body: JSON.stringify({invite_code: code})
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            document.getElementById('foreignCode').value = '';
+            showMessage(data.message || 'Инвайт‑код успешно активирован!', 'success');
+            loadProfile();
+        } else {
+            const errorData = await resp.json();
+            showMessage(parseErrorResponse(errorData), 'error');
+        }
+    } catch (e) {
+        showMessage('Ошибка сети: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = originalText;
+    }
+}
+
+
+document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+{% endblock %}

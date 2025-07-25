@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}Авторизация | Hummer Systems{% endblock %}
+{% block content %}
+<style>
+  .auth-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 70vh;
+  }
+  .auth-card {
+      background: #1e293b;
+      padding: 2rem;
+      border-radius: 1rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+  .auth-card h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1.5rem;
+  }
+  .auth-card input {
+      width: 100%;
+      padding: 0.9rem;
+      border-radius: 0.6rem;
+      border: none;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      background: #fff;
+      color: #000;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+      box-sizing: border-box;
+  }
+  .auth-card input::placeholder { color:#888; }
+  .auth-card button {
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 0.6rem;
+      font-size: 1rem;
+      color: #fff;
+      background: linear-gradient(90deg, #06b6d4, #3b82f6);
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+  }
+  .auth-card button:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+  }
+  .code-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+  }
+  .hidden { display:none; }
+  .message {
+      display: none;
+      margin-bottom: 1rem;
+      padding: 0.8rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.95rem;
+      text-align: center;
+  }
+  .message.success {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid #22c55e;
+  }
+  .message.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid #ef4444;
+  }
+
+</style>
+
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div id="topMessage" class="message"></div>
+
+    <div id="step-phone">
+      <h1>Введите номер</h1>
+      <input id="phone" type="text" placeholder="Введите номер">
+      <button id="sendPhoneBtn" onclick="sendPhone()">Отправить</button>
+    </div>
+
+    <div id="step-code" class="hidden">
+      <h1>Введите код</h1>
+      <div class="code-input-group">
+        <input id="code" type="text" placeholder="Введите код">
+        <button id="verifyCodeBtn" onclick="verifyCode()">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+function showTopMessage(text, type='success') {
+  const msg = document.getElementById('topMessage');
+  msg.textContent = text;
+  msg.className = 'message ' + type;
+  msg.style.display = 'block';
+  setTimeout(() => {
+    msg.style.display = 'none';
+  }, 4000);
+}
+
+function parseErrorResponse(errorData) {
+  if (typeof errorData === 'string') return errorData;
+  if (errorData.error) return errorData.error;
+  if (errorData.detail) return errorData.detail;
+  if (errorData.phone_number) return Array.isArray(errorData.phone_number) ? errorData.phone_number.join(' ') : errorData.phone_number;
+  if (errorData.code) return Array.isArray(errorData.code) ? errorData.code.join(' ') : errorData.code;
+  return JSON.stringify(errorData);
+}
+
+function validatePhone(phone) {
+  if (!phone) return 'Введите номер телефона.';
+  if (!phone.startsWith('+')) return 'Номер должен начинаться с +.';
+  const digits = phone.slice(1);
+  if (!/^\d+$/.test(digits)) return 'После + должны быть только цифры.';
+  if (phone.length > 15) return 'Номер не должен быть длиннее 15 символов.';
+  return '';
+}
+
+function validateCode(code) {
+  if (!code) return 'Введите код подтверждения.';
+  if (!/^\d{4}$/.test(code)) return 'Код должен состоять из 4 цифр.';
+  return '';
+}
+
+async function sendPhone() {
+  const phone = document.getElementById('phone').value.trim();
+  const err = validatePhone(phone);
+  if (err) {
+    showTopMessage(err, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('sendPhoneBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = 'Отправка…';
+
+  try {
+    const resp = await fetch('/auth/phone/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ phone_number: phone })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      showTopMessage(`✅ Код ${data.test_code} отправлен на номер ${data.phone_number}`, 'success');
+      document.getElementById('step-phone').classList.add('hidden');
+      document.getElementById('step-code').classList.remove('hidden');
+      window.currentPhone = data.phone_number;
+    } else {
+      const errorData = await resp.json();
+      showTopMessage(parseErrorResponse(errorData), 'error');
+    }
+  } catch (e) {
+    console.error(e);
+    showTopMessage('Ошибка сети: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+
+async function verifyCode() {
+  const code = document.getElementById('code').value.trim();
+  const err = validateCode(code);
+  if (err) {
+    showTopMessage(err, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('verifyCodeBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = 'Проверка…';
+
+  let success = false;
+
+  try {
+    const resp = await fetch('/auth/verify/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ phone_number: window.currentPhone, code: code })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      sessionStorage.setItem('access', data.access);
+      showTopMessage('✅ Код принят! Перенаправляем...', 'success');
+      success = true;
+      setTimeout(() => { window.location.href = '/ui/profile/'; }, 500);
+    } else {
+      const errorData = await resp.json();
+      showTopMessage(parseErrorResponse(errorData), 'error');
+    }
+  } catch (e) {
+    console.error(e);
+    showTopMessage('Ошибка сети: ' + e.message, 'error');
+  } finally {
+    if (!success) {
+      btn.disabled = false;
+      btn.textContent = oldText;
+    }
+  }
+}
+
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>
+{% endblock %}

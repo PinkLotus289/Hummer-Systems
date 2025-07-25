@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Hummer Systems{% endblock %}</title>
+  <style>
+    body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:#f8fafc; }
+    header {
+      background:#1e293b;
+      padding:1rem 2rem;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+    header .logo {
+      font-size:1.5rem;
+      font-weight:800;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+    header nav a {
+      color:#38bdf8;
+      margin-left:1.5rem;
+      text-decoration:none;
+      font-size:1rem;
+      font-weight:500;
+      transition:opacity 0.2s ease;
+    }
+    header nav a:hover { opacity:0.8; }
+    main { padding:2rem; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <div class="logo">Hummer Systems</div>
+    <nav>
+      <a href="/ui/phone_form/">Авторизация</a>
+      <a href="/admin/" target="_blank">Админ‑панель</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
