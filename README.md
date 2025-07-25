@@ -48,7 +48,7 @@ Response:
 
 Request:
 {
-  "phone": "+79991234567",
+  "phone_number": "+79991234567",
   "code": "1234"
 }
 
@@ -71,7 +71,7 @@ Response:
 
 Response:
 {
-  "phone": "+79991234567",
+  "phone_number": "+79991234567",
   "invite_code": "A1B2C3",
   "activated_invite_code": QXIMAA,
   "referrals": 
@@ -122,8 +122,8 @@ Response (если код не найден):
 
 - User
 
-id
-phone
-invite_code
+id,
+phone,
+invite_code,
 activated_invite_code (nullable)
 
